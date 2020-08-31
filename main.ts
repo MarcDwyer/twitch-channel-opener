@@ -5,52 +5,45 @@ import { green } from "https://deno.land/std/fmt/colors.ts";
 
 import { Followers } from "./followers.ts";
 import { Commands } from "./commands.ts";
+import { CommandPhase, Phases } from "./cli_phase.ts";
 
-const runCmd = async (channel: string) => {
-  const url =
-    `https://player.twitch.tv/?channel=${channel}&enableExtensions=false&muted=false&parent=twitch.tv&player=popout&volume=0.08
-  `;
-  const cmd = [
-    "open",
-    url,
-  ];
-  const p = Deno.run({
-    cmd,
-  });
-  try {
-    const s = await p.status();
-    return s;
-  } catch (err) {
-    throw new Error("Error running comand");
-  }
-};
 const clientId = Deno.env.get("CLIENT_ID") || "123",
   oauth = Deno.env.get("TWITCH_OAUTH") || "123";
 
 const followers = new Followers(clientId, oauth);
 
 const listen = async () => {
-  for await (const follow of followers) {
-    console.log(green(follow.channel.name));
+  for await (const [num, stream] of followers) {
+    console.log(green(`[${num}]: ${stream.channel.name}`));
   }
 };
 
 const cli = async (): Promise<void> => {
   const tpr = new TextProtoReader(new BufReader(Deno.stdin));
+  const cmder = new CommandPhase();
   while (true) {
-    await Deno.stdout.write(encode("Command/Channel: "));
+    await Deno.stdout.write(encode(cmder.prefix));
     const line = await tpr.readLine();
-    if (line === null || line === Commands.exit) {
+    if (line === null || line === "exit") {
       followers.signal.reject("Program exiting...");
       break;
     }
-    switch (line) {
-      case Commands.followers:
-        followers.signal.resolve();
+    if (line[0] === "!") {
+      cmder.setStatus(line.substring(1, line.length));
+      followers.signal.resolve();
+      continue;
+    }
+    switch (cmder.phase) {
+      case Phases.followers:
+        const n = Number(line);
+        if (isNaN(n)) continue;
+        await cmder.runCmd(followers.data.get(n)?.channel.name || "lcs");
         break;
-
+      case Phases.normal:
+        await cmder.runCmd(line);
+        break;
       default:
-        await runCmd(line);
+        console.log(`Default ran here =(`);
     }
   }
 };

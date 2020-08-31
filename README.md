@@ -1,8 +1,8 @@
 # What this is
 
-This is a deno cli that opens Google Chrome and directs you to the channel name you provided.
-This opens your desired channel in a full screen tab with extensions and twitch chat disabled.
+A Deno cli that opens twitch channels using a URL that does not load twitch's chat or extensions. Also has some commands, such as viewing your followers list. More commands
+will be implemented the more I use it. It may also be converted to a Deno package.
 
 ## Why
 
-Because twitch chat, extensions are really lame.
+Because twitch chat and it's extensions use a lot of resources. Viewing streams in this manner conserves battery life if you're on a laptop.

@@ -1,43 +1,53 @@
 import { TextProtoReader } from "https://deno.land/std/textproto/mod.ts";
 import { BufReader } from "https://deno.land/std/io/bufio.ts";
 import { encode } from "https://deno.land/std/encoding/utf8.ts";
-import { green } from "https://deno.land/std/fmt/colors.ts";
 
 import { Followers } from "./followers.ts";
-import { Commands } from "./commands.ts";
-import { CommandPhase, Phases } from "./cli_phase.ts";
-
+import { Commander } from "./commander.ts";
+import { Phases, Commands } from "./commands_phases.ts";
+import { red } from "https://deno.land/std@0.66.0/fmt/colors.ts";
 const clientId = Deno.env.get("CLIENT_ID") || "123",
   oauth = Deno.env.get("TWITCH_OAUTH") || "123";
 
 const followers = new Followers(clientId, oauth);
 
-const listen = async () => {
-  for await (const [num, stream] of followers) {
-    console.log(green(`[${num}]: ${stream.channel.name}`));
-  }
-};
+await followers.fetchFollows();
 
 const cli = async (): Promise<void> => {
   const tpr = new TextProtoReader(new BufReader(Deno.stdin));
-  const cmder = new CommandPhase();
+  const cmder = new Commander(followers);
   while (true) {
     await Deno.stdout.write(encode(cmder.prefix));
     const line = await tpr.readLine();
-    if (line === null || line === "exit") {
-      followers.signal.reject("Program exiting...");
+    if (line === null || cmder.phase == Phases.normal && line === "exit") {
+      cmder.exit();
       break;
     }
-    if (line[0] === "!") {
-      cmder.setStatus(line.substring(1, line.length));
-      followers.signal.resolve();
+    if (line === "exit") {
+      cmder.reset();
+      continue;
+    }
+    if (line in Phases) {
+      cmder.setPhase(line);
+      continue;
+    }
+    if (line in Commands) {
+      switch (line) {
+        case Commands.show:
+          cmder.showFollowers();
+      }
       continue;
     }
     switch (cmder.phase) {
       case Phases.followers:
         const n = Number(line);
-        if (isNaN(n)) continue;
-        await cmder.runCmd(followers.data.get(n)?.channel.name || "lcs");
+        if (isNaN(n)) {
+          console.log(red("Must be a number"));
+          continue;
+        }
+        const chan = followers.data.get(n)?.channel.name;
+        if (!chan) continue;
+        await cmder.runCmd(chan);
         break;
       case Phases.normal:
         await cmder.runCmd(line);
@@ -47,5 +57,4 @@ const cli = async (): Promise<void> => {
     }
   }
 };
-listen();
 await cli();

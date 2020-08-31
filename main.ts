@@ -12,8 +12,6 @@ const runCmd = async (channel: string) => {
   `;
   const cmd = [
     "open",
-    "-a",
-    "Google Chrome",
     url,
   ];
   const p = Deno.run({
@@ -43,7 +41,6 @@ const cli = async (): Promise<void> => {
     await Deno.stdout.write(encode("Command/Channel: "));
     const line = await tpr.readLine();
     if (line === null || line === Commands.exit) {
-      console.log("exiting");
       followers.signal.reject("Program exiting...");
       break;
     }
